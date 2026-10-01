@@ -1,0 +1,31 @@
+services:
+  postgresql:
+    image: postgresql:latest
+    ports:
+      - "5432:5432"
+    container_name: postgresql
+    environment:
+      - name=value
+    volumes:
+      -
+    networks:
+      - weather
+  server:
+    build: ./server
+    ports:
+      - "8080:8080"
+    container_name: weather_server
+    networks:
+      - weather
+  
+  client-web:
+    build: ./client/web
+    ports:
+      - "80:80"
+    container_name: weather_client_web
+    networks:
+      - weather
+
+networks:
+  weather:
+    host: bridge
