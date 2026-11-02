@@ -1,0 +1,45 @@
+# ──────────────────────────────────────────────
+# nginx 설정 템플릿
+# Docker 컨테이너 시작 시 ${API_KEY_DATA_GO_KR} 환경변수가 자동 치환된다.
+# 정적 파일 서빙 + 기상청 API 프록시 역할을 수행한다.
+# ──────────────────────────────────────────────
+
+server {
+    listen 80;
+    server_name localhost;
+
+    # 정적 파일 서빙 (React 빌드 결과물)
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # SPA 라우팅 지원: 존재하지 않는 경로는 index.html로 폴백
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 기상청 API 프록시
+    # 프론트엔드의 /api/* 요청을 기상청 서버로 전달하고 API 키를 자동 주입한다.
+    location /api/ {
+        # /api/ 접두사를 제거하고 기상청 엔드포인트로 전달
+        rewrite ^/api/(.*)$ /1360000/VilageFcstInfoService_2.0/$1 break;
+
+        proxy_pass http://apis.data.go.kr;
+        proxy_set_header Host apis.data.go.kr;
+        proxy_set_header Accept-Encoding "";
+
+        # API 키를 쿼리 파라미터에 추가
+        set $delimeter "";
+        if ($is_args) {
+            set $delimeter "&";
+        }
+        if ($is_args = "") {
+            set $delimeter "?";
+        }
+        proxy_pass http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/$1$is_args$args${delimeter}serviceKey=${API_KEY_DATA_GO_KR};
+    }
+
+    # gzip 압축
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml;
+    gzip_min_length 1000;
+}
