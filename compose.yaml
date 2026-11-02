@@ -6,8 +6,6 @@ services:
     container_name: postgresql
     environment:
       - name=value
-    volumes:
-      -
     networks:
       - weather
   server:
@@ -28,4 +26,4 @@ services:
 
 networks:
   weather:
-    host: bridge
+    driver: bridge
