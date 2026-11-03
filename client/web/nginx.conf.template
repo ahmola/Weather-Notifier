@@ -31,7 +31,8 @@ server {
     # ※ serviceKey는 공공데이터포털의 "Encoding" 인증키를 사용해야 한다(이미 URL 인코딩된 값).
     location /api/ {
         # 주의: set은 rewrite 모듈 지시어라 'rewrite ... break' 뒤에 두면 실행되지 않는다.
-        set $kma_upstream https://apis.data.go.kr;
+        # KMA_UPSTREAM 기본값은 Dockerfile에서 https://apis.data.go.kr 로 지정한다.
+        set $kma_upstream ${KMA_UPSTREAM};
         rewrite ^/api/(.*)$ /1360000/VilageFcstInfoService_2.0/$1?serviceKey=${API_KEY_DATA_GO_KR} break;
 
         # 업스트림 DNS를 요청 시점에 조회한다.

@@ -35,13 +35,21 @@ const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototyp
 
 /** 모든 요소의 scrollWidth/clientWidth를 지정한 값으로 고정한다 */
 function mockLayout(scrollWidth: number, clientWidth: number) {
-  Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, get: () => scrollWidth });
-  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => clientWidth });
+  Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+    configurable: true,
+    get: () => scrollWidth,
+  });
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+    configurable: true,
+    get: () => clientWidth,
+  });
 }
 
 afterEach(() => {
-  if (originalScrollWidth) Object.defineProperty(HTMLElement.prototype, 'scrollWidth', originalScrollWidth);
-  if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+  if (originalScrollWidth)
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', originalScrollWidth);
+  if (originalClientWidth)
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
 });
 
 describe('ForecastList', () => {

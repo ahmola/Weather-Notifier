@@ -39,6 +39,8 @@ export default defineConfig(({ mode }) => {
       globals: true,
       environment: 'jsdom',
       setupFiles: './src/__tests__/setup.ts',
+      // 단위 테스트만 실행 (e2e/ 는 Playwright가 실행)
+      include: ['src/**/*.test.{ts,tsx}'],
       css: true,
     },
   };

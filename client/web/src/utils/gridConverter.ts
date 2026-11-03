@@ -45,9 +45,7 @@ export function gpsToGrid(gps: GpsCoord): GridCoord {
   const olat = OLAT * DEGRAD;
 
   // sn: 투영 원뿔의 경사율
-  let sn =
-    Math.tan(Math.PI * 0.25 + slat2 * 0.5) /
-    Math.tan(Math.PI * 0.25 + slat1 * 0.5);
+  let sn = Math.tan(Math.PI * 0.25 + slat2 * 0.5) / Math.tan(Math.PI * 0.25 + slat1 * 0.5);
   sn = Math.log(Math.cos(slat1) / Math.cos(slat2)) / Math.log(sn);
 
   // sf: 투영 스케일 팩터

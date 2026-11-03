@@ -15,12 +15,7 @@ import { LOCATIONS } from '../../constants/locations';
 
 describe('LocationSelector', () => {
   it('모든 도시 옵션이 렌더링된다', () => {
-    render(
-      <LocationSelector
-        selected={LOCATIONS[0]}
-        onChange={() => {}}
-      />,
-    );
+    render(<LocationSelector selected={LOCATIONS[0]} onChange={() => {}} />);
 
     const select = screen.getByLabelText('지역 선택') as HTMLSelectElement;
     const options = select.querySelectorAll('option');
@@ -33,12 +28,7 @@ describe('LocationSelector', () => {
 
   it('현재 선택된 도시가 표시된다', () => {
     const busan = LOCATIONS.find((l) => l.name === '부산')!;
-    render(
-      <LocationSelector
-        selected={busan}
-        onChange={() => {}}
-      />,
-    );
+    render(<LocationSelector selected={busan} onChange={() => {}} />);
 
     const select = screen.getByLabelText('지역 선택') as HTMLSelectElement;
     expect(select.value).toBe('부산');
@@ -48,12 +38,7 @@ describe('LocationSelector', () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
 
-    render(
-      <LocationSelector
-        selected={LOCATIONS[0]}
-        onChange={onChange}
-      />,
-    );
+    render(<LocationSelector selected={LOCATIONS[0]} onChange={onChange} />);
 
     const select = screen.getByLabelText('지역 선택');
     await user.selectOptions(select, '부산');

@@ -140,7 +140,11 @@ export function extractErrorDetail(body: string): string {
   } catch {
     /* JSON 아님 */
   }
-  return body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+  return body
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
 }
 
 /**
@@ -148,10 +152,9 @@ export function extractErrorDetail(body: string): string {
  * 인증키 오류 등은 JSON이 아닌 XML(OpenAPI_ServiceResponse)로 내려오므로
  * 본문을 먼저 텍스트로 읽은 뒤 파싱하여 원인을 에러 메시지에 담는다.
  */
-async function requestApi<T extends { response: { header: { resultCode: string; resultMsg: string } } }>(
-  endpoint: string,
-  params: Record<string, string | number>,
-): Promise<T> {
+async function requestApi<
+  T extends { response: { header: { resultCode: string; resultMsg: string } } },
+>(endpoint: string, params: Record<string, string | number>): Promise<T> {
   const res = await fetch(`${BASE_URL}/${endpoint}?${buildQuery(params)}`);
   const text = await res.text();
   if (!res.ok) {
@@ -181,10 +184,7 @@ async function requestApi<T extends { response: { header: { resultCode: string; 
 /**
  * 초단기실황 데이터를 가져온다 (현재 날씨).
  */
-export async function fetchCurrentWeather(
-  nx: number,
-  ny: number,
-): Promise<CurrentWeather> {
+export async function fetchCurrentWeather(nx: number, ny: number): Promise<CurrentWeather> {
   const { baseDate, baseTime } = getNcstBaseDateTime();
   const data = await requestApi<NcstApiResponse>('getUltraSrtNcst', {
     pageNo: 1,
@@ -202,10 +202,7 @@ export async function fetchCurrentWeather(
 /**
  * 초단기예보 데이터를 가져온다 (향후 6시간 예보).
  */
-export async function fetchForecast(
-  nx: number,
-  ny: number,
-): Promise<ForecastItem[]> {
+export async function fetchForecast(nx: number, ny: number): Promise<ForecastItem[]> {
   const { baseDate, baseTime } = getUltraSrtFcstBaseDateTime();
   const data = await requestApi<FcstApiResponse>('getUltraSrtFcst', {
     pageNo: 1,
@@ -283,7 +280,7 @@ export function parseForecastItems(items: FcstItem[]): ForecastItem[] {
       dateTime: key,
       displayTime: `${hour}:${minute}`,
       temperature: parseFloat(values.get('T1H') ?? '0'),
-      skyCondition: (parseInt(values.get('SKY') ?? '1', 10) as SkyCondition),
+      skyCondition: parseInt(values.get('SKY') ?? '1', 10) as SkyCondition,
       precipitationType: parseInt(values.get('PTY') ?? '0', 10) as PrecipitationType,
       humidity: parseInt(values.get('REH') ?? '0', 10),
     });

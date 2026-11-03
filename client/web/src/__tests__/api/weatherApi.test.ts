@@ -105,11 +105,25 @@ describe('getVilageFcstBaseDateTime', () => {
 describe('parseCurrentWeather', () => {
   it('초단기실황 응답 아이템을 CurrentWeather로 정확히 파싱한다', () => {
     const items: NcstItem[] = [
-      { baseDate: '20261102', baseTime: '1400', category: 'T1H', obsrValue: '15.2', nx: 60, ny: 127 },
+      {
+        baseDate: '20261102',
+        baseTime: '1400',
+        category: 'T1H',
+        obsrValue: '15.2',
+        nx: 60,
+        ny: 127,
+      },
       { baseDate: '20261102', baseTime: '1400', category: 'REH', obsrValue: '65', nx: 60, ny: 127 },
       { baseDate: '20261102', baseTime: '1400', category: 'PTY', obsrValue: '0', nx: 60, ny: 127 },
       { baseDate: '20261102', baseTime: '1400', category: 'RN1', obsrValue: '0', nx: 60, ny: 127 },
-      { baseDate: '20261102', baseTime: '1400', category: 'WSD', obsrValue: '3.4', nx: 60, ny: 127 },
+      {
+        baseDate: '20261102',
+        baseTime: '1400',
+        category: 'WSD',
+        obsrValue: '3.4',
+        nx: 60,
+        ny: 127,
+      },
     ];
 
     const result = parseCurrentWeather(items);
@@ -137,14 +151,86 @@ describe('parseCurrentWeather', () => {
 describe('parseForecastItems', () => {
   it('초단기예보 응답을 시간대별로 그룹핑하여 파싱한다', () => {
     const items: FcstItem[] = [
-      { baseDate: '20261102', baseTime: '1430', category: 'T1H', fcstDate: '20261102', fcstTime: '1500', fcstValue: '14', nx: 60, ny: 127 },
-      { baseDate: '20261102', baseTime: '1430', category: 'SKY', fcstDate: '20261102', fcstTime: '1500', fcstValue: '1', nx: 60, ny: 127 },
-      { baseDate: '20261102', baseTime: '1430', category: 'PTY', fcstDate: '20261102', fcstTime: '1500', fcstValue: '0', nx: 60, ny: 127 },
-      { baseDate: '20261102', baseTime: '1430', category: 'REH', fcstDate: '20261102', fcstTime: '1500', fcstValue: '55', nx: 60, ny: 127 },
-      { baseDate: '20261102', baseTime: '1430', category: 'T1H', fcstDate: '20261102', fcstTime: '1600', fcstValue: '13', nx: 60, ny: 127 },
-      { baseDate: '20261102', baseTime: '1430', category: 'SKY', fcstDate: '20261102', fcstTime: '1600', fcstValue: '3', nx: 60, ny: 127 },
-      { baseDate: '20261102', baseTime: '1430', category: 'PTY', fcstDate: '20261102', fcstTime: '1600', fcstValue: '1', nx: 60, ny: 127 },
-      { baseDate: '20261102', baseTime: '1430', category: 'REH', fcstDate: '20261102', fcstTime: '1600', fcstValue: '70', nx: 60, ny: 127 },
+      {
+        baseDate: '20261102',
+        baseTime: '1430',
+        category: 'T1H',
+        fcstDate: '20261102',
+        fcstTime: '1500',
+        fcstValue: '14',
+        nx: 60,
+        ny: 127,
+      },
+      {
+        baseDate: '20261102',
+        baseTime: '1430',
+        category: 'SKY',
+        fcstDate: '20261102',
+        fcstTime: '1500',
+        fcstValue: '1',
+        nx: 60,
+        ny: 127,
+      },
+      {
+        baseDate: '20261102',
+        baseTime: '1430',
+        category: 'PTY',
+        fcstDate: '20261102',
+        fcstTime: '1500',
+        fcstValue: '0',
+        nx: 60,
+        ny: 127,
+      },
+      {
+        baseDate: '20261102',
+        baseTime: '1430',
+        category: 'REH',
+        fcstDate: '20261102',
+        fcstTime: '1500',
+        fcstValue: '55',
+        nx: 60,
+        ny: 127,
+      },
+      {
+        baseDate: '20261102',
+        baseTime: '1430',
+        category: 'T1H',
+        fcstDate: '20261102',
+        fcstTime: '1600',
+        fcstValue: '13',
+        nx: 60,
+        ny: 127,
+      },
+      {
+        baseDate: '20261102',
+        baseTime: '1430',
+        category: 'SKY',
+        fcstDate: '20261102',
+        fcstTime: '1600',
+        fcstValue: '3',
+        nx: 60,
+        ny: 127,
+      },
+      {
+        baseDate: '20261102',
+        baseTime: '1430',
+        category: 'PTY',
+        fcstDate: '20261102',
+        fcstTime: '1600',
+        fcstValue: '1',
+        nx: 60,
+        ny: 127,
+      },
+      {
+        baseDate: '20261102',
+        baseTime: '1430',
+        category: 'REH',
+        fcstDate: '20261102',
+        fcstTime: '1600',
+        fcstValue: '70',
+        nx: 60,
+        ny: 127,
+      },
     ];
 
     const result = parseForecastItems(items);
@@ -196,7 +282,9 @@ describe('extractErrorDetail', () => {
   });
 
   it('평문/HTML 응답은 태그를 제거해 반환한다', () => {
-    expect(extractErrorDetail('<html><body><h1>403 Forbidden</h1></body></html>')).toBe('403 Forbidden');
+    expect(extractErrorDetail('<html><body><h1>403 Forbidden</h1></body></html>')).toBe(
+      '403 Forbidden',
+    );
     expect(extractErrorDetail('Forbidden')).toBe('Forbidden');
   });
 });
@@ -212,6 +300,8 @@ describe('extractErrorDetail (JSON 인증 오류)', () => {
         },
       },
     });
-    expect(extractErrorDetail(body)).toBe('등록되지 않은 서비스키 (SERVICE_KEY_IS_NOT_REGISTERED_ERROR)');
+    expect(extractErrorDetail(body)).toBe(
+      '등록되지 않은 서비스키 (SERVICE_KEY_IS_NOT_REGISTERED_ERROR)',
+    );
   });
 });

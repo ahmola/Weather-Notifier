@@ -27,7 +27,7 @@ describe('gpsToGrid', () => {
 
   // 격자 경계 근처 좌표는 ±1 차이가 날 수 있으므로 기상청 격자표의 대표 좌표를 사용한다.
   it('제주 위경도를 정확한 격자 좌표로 변환한다', () => {
-    const result = gpsToGrid({ lat: 33.4890, lng: 126.4983 });
+    const result = gpsToGrid({ lat: 33.489, lng: 126.4983 });
     expect(result.nx).toBe(52);
     expect(result.ny).toBe(38);
   });

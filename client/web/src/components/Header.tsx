@@ -17,9 +17,7 @@ export default function Header() {
 
   return (
     <header className="text-center py-6">
-      <h1 className="text-3xl font-bold text-white drop-shadow-lg">
-        🌤️ 날씨 대시보드
-      </h1>
+      <h1 className="text-3xl font-bold text-white drop-shadow-lg">🌤️ 날씨 대시보드</h1>
       <p className="text-white/70 mt-1 text-sm">{time}</p>
     </header>
   );
