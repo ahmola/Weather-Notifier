@@ -36,8 +36,10 @@ COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # 헬스체크
+# localhost 대신 127.0.0.1을 사용한다: IPv6가 켜진 환경(GitHub Actions 러너 등)에서는
+# localhost가 ::1로 먼저 해석되는데, nginx 설정은 IPv4(listen 80)만 열고 있어 실패한다.
 HEALTHCHECK --interval=30s --timeout=3s \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || exit 1
 
 EXPOSE 80
 
