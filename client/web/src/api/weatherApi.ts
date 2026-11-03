@@ -120,6 +120,25 @@ function buildQuery(params: Record<string, string | number>): string {
 }
 
 /**
+ * 오류 응답 본문에서 사람이 읽을 수 있는 메시지를 뽑아낸다.
+ * data.go.kr은 XML(returnAuthMsg/errMsg), JSON, 평문(Forbidden 등) 등 다양한 형태로 오류를 준다.
+ */
+export function extractErrorDetail(body: string): string {
+  const xmlMsg =
+    body.match(/<returnAuthMsg>(.*?)<\/returnAuthMsg>/)?.[1] ??
+    body.match(/<errMsg>(.*?)<\/errMsg>/)?.[1];
+  if (xmlMsg) return xmlMsg;
+  try {
+    const json = JSON.parse(body);
+    const msg = json?.response?.header?.resultMsg ?? json?.message ?? json?.error;
+    if (typeof msg === 'string') return msg;
+  } catch {
+    /* JSON 아님 */
+  }
+  return body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+
+/**
  * 프록시를 통해 기상청 API를 호출하고 JSON 응답을 반환한다.
  * 인증키 오류 등은 JSON이 아닌 XML(OpenAPI_ServiceResponse)로 내려오므로
  * 본문을 먼저 텍스트로 읽은 뒤 파싱하여 원인을 에러 메시지에 담는다.
@@ -130,7 +149,11 @@ async function requestApi<T extends { response: { header: { resultCode: string; 
 ): Promise<T> {
   const res = await fetch(`${BASE_URL}/${endpoint}?${buildQuery(params)}`);
   const text = await res.text();
-  if (!res.ok) throw new Error(`API 요청 실패: ${res.status}`);
+  if (!res.ok) {
+    // 원인 파악을 위해 응답 본문(인증 오류 메시지 등)을 에러에 포함한다.
+    const detail = extractErrorDetail(text);
+    throw new Error(`API 요청 실패: ${res.status}${detail ? ` - ${detail}` : ''}`);
+  }
 
   let data: T;
   try {
@@ -138,7 +161,9 @@ async function requestApi<T extends { response: { header: { resultCode: string; 
   } catch {
     const reason = text.match(/<returnAuthMsg>(.*?)<\/returnAuthMsg>/)?.[1];
     throw new Error(
-      reason ? `API 인증 오류: ${reason} (인증키를 확인하세요)` : 'API 응답을 해석할 수 없습니다.',
+      reason
+        ? `API 인증 오류: ${reason} (인증키를 확인하세요)`
+        : `API 응답을 해석할 수 없습니다: ${extractErrorDetail(text)}`,
     );
   }
 

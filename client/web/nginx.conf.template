@@ -6,6 +6,12 @@
 # 정적 파일 서빙 + 기상청 API 프록시 역할을 수행한다.
 # ──────────────────────────────────────────────
 
+# API 프록시 로그 형식: 업스트림(data.go.kr) 응답 코드를 함께 남긴다.
+# $request는 rewrite 이전의 원래 요청이라 인증키가 포함되지 않는다.
+log_format kma_api '$remote_addr [$time_local] "$request" status=$status '
+                   'upstream_status=$upstream_status upstream=$upstream_addr '
+                   'rt=$request_time urt=$upstream_response_time';
+
 server {
     listen 80;
     server_name localhost;
@@ -40,8 +46,8 @@ server {
         proxy_connect_timeout 5s;
         proxy_read_timeout 10s;
 
-        # 인증키가 포함된 URL이 access log에 남지 않도록 한다.
-        access_log off;
+        # 인증키가 없는 원래 요청 + 업스트림 응답 코드를 기록한다 (docker compose logs client-web)
+        access_log /var/log/nginx/access.log kma_api;
     }
 
     # gzip 압축

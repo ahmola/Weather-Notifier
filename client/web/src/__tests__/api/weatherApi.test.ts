@@ -21,6 +21,7 @@ import {
   parseCurrentWeather,
   parseForecastItems,
   formatRainfall,
+  extractErrorDetail,
 } from '../../api/weatherApi';
 import type { NcstItem, FcstItem } from '../../types/weather';
 
@@ -183,5 +184,19 @@ describe('formatRainfall', () => {
 
   it('숫자가 아닌 문자열은 그대로 반환한다', () => {
     expect(formatRainfall('30.0~50.0mm')).toBe('30.0~50.0mm');
+  });
+});
+
+describe('extractErrorDetail', () => {
+  it('data.go.kr XML 인증 오류 메시지를 추출한다', () => {
+    const xml =
+      '<OpenAPI_ServiceResponse><cmmMsgHeader><errMsg>SERVICE ERROR</errMsg>' +
+      '<returnAuthMsg>SERVICE_KEY_IS_NOT_REGISTERED_ERROR</returnAuthMsg></cmmMsgHeader></OpenAPI_ServiceResponse>';
+    expect(extractErrorDetail(xml)).toBe('SERVICE_KEY_IS_NOT_REGISTERED_ERROR');
+  });
+
+  it('평문/HTML 응답은 태그를 제거해 반환한다', () => {
+    expect(extractErrorDetail('<html><body><h1>403 Forbidden</h1></body></html>')).toBe('403 Forbidden');
+    expect(extractErrorDetail('Forbidden')).toBe('Forbidden');
   });
 });
