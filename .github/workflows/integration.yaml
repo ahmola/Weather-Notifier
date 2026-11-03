@@ -1,0 +1,194 @@
+# ──────────────────────────────────────────────
+# Integration CI 파이프라인 (현재: Web 클라이언트)
+#
+# 실행 시점: client/web 또는 이 워크플로 파일이 바뀐 push / Pull Request, 수동 실행
+#
+# Job 구성:
+#   1. web-test   : 의존성 설치 → 단위 테스트 → 타입체크 + 프로덕션 빌드
+#   2. web-audit  : 프로덕션 의존성 보안 취약점 검사 (npm audit)
+#   3. web-docker : Docker 이미지 빌드(Caddy, nginx) → 컨테이너 실행 → 헬스체크 / 스모크 테스트
+#                   (web-test가 성공해야 실행)
+#
+# 선택 사항:
+#   저장소 Secret에 API_KEY_DATA_GO_KR(Encoding 키)를 등록하면
+#   web-docker에서 실제 기상청 API 호출까지 확인한다. (없으면 해당 단계는 건너뜀)
+# ──────────────────────────────────────────────
+
+name: Integration
+
+on:
+  push:
+    branches: [main, "milestone/**"]
+    paths:
+      - "client/web/**"
+      - ".github/workflows/integration.yaml"
+  pull_request:
+    paths:
+      - "client/web/**"
+      - ".github/workflows/integration.yaml"
+  workflow_dispatch:
+
+# 같은 브랜치에 새 커밋이 올라오면 이전 실행은 취소한다.
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+# 기본 권한은 읽기 전용
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. 테스트 + 빌드 ──
+  web-test:
+    name: Web - 테스트 / 빌드
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: client/web
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설정 (npm 캐시 사용)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/web/package-lock.json
+
+      - name: 의존성 설치
+        run: npm ci --no-audit --no-fund
+
+      - name: 단위 테스트 (Vitest)
+        run: npm run test:run
+
+      # build 스크립트가 tsc(타입체크) → vite build 순서로 실행한다.
+      - name: 타입체크 + 프로덕션 빌드
+        run: npm run build
+
+      - name: 빌드 결과물 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: client/web/dist
+          retention-days: 7
+
+  # ── 2. 의존성 보안 검사 ──
+  web-audit:
+    name: Web - 의존성 취약점 검사
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: client/web
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 브라우저로 배포되는 프로덕션 의존성만 검사하고, high 이상이면 실패 처리한다.
+      - name: npm audit (production, high 이상)
+        run: npm audit --omit=dev --audit-level=high
+
+  # ── 3. Docker 빌드 + 헬스체크 ──
+  web-docker:
+    name: Web - Docker (${{ matrix.server }})
+    needs: web-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - server: caddy
+            dockerfile: Dockerfile.caddy
+          - server: nginx
+            dockerfile: Dockerfile
+    env:
+      # 이미지/컨테이너 이름
+      IMAGE: weather-web-${{ matrix.server }}:ci
+      CONTAINER: weather-web-${{ matrix.server }}
+      # 헬스체크 대기 최대 시간(초)
+      HEALTH_TIMEOUT: 60
+      # 실제 API 확인용 키 (Secret 미등록 시 빈 값)
+      API_KEY: ${{ secrets.API_KEY_DATA_GO_KR }}
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Docker Buildx 설정
+        uses: docker/setup-buildx-action@v3
+
+      # GitHub Actions 캐시로 레이어(npm ci 등)를 재사용해 빌드 시간을 줄인다.
+      - name: 이미지 빌드
+        uses: docker/build-push-action@v6
+        with:
+          context: client/web
+          file: client/web/${{ matrix.dockerfile }}
+          tags: ${{ env.IMAGE }}
+          load: true
+          push: false
+          cache-from: type=gha,scope=web-${{ matrix.server }}
+          cache-to: type=gha,mode=max,scope=web-${{ matrix.server }}
+
+      # Dockerfile의 HEALTHCHECK 주기(30s)를 CI에서는 2s로 줄여 빠르게 확인한다.
+      - name: 컨테이너 실행
+        run: |
+          docker run -d --name "$CONTAINER" -p 8080:80 \
+            -e API_KEY_DATA_GO_KR="${API_KEY:-ci-dummy-key}" \
+            --health-interval=2s --health-timeout=3s --health-retries=5 \
+            "$IMAGE"
+
+      - name: 헬스체크 대기 (healthy 상태 확인)
+        run: |
+          for i in $(seq "$HEALTH_TIMEOUT"); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' "$CONTAINER")
+            echo "[$i s] health=$status"
+            if [ "$status" = "healthy" ]; then exit 0; fi
+            if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER")" != "true" ]; then
+              echo "::error::컨테이너가 종료되었습니다."; exit 1
+            fi
+            sleep 1
+          done
+          echo "::error::${HEALTH_TIMEOUT}초 안에 healthy 상태가 되지 않았습니다."
+          exit 1
+
+      - name: 스모크 테스트 (정적 파일 / SPA 라우팅)
+        run: |
+          # 지정한 경로의 HTTP 상태 코드가 기대값인지 확인한다.
+          check() {
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080$1")
+            echo "$1 → $code (기대값 $2)"
+            [ "$code" = "$2" ] || { echo "::error::$1 응답 코드가 $code 입니다."; exit 1; }
+          }
+          check /            200
+          check /favicon.svg 200
+          check /some/route  200   # 없는 경로도 index.html로 폴백되어야 한다
+          curl -s http://localhost:8080/ | grep -q '<div id="root">' \
+            || { echo "::error::index.html 내용이 올바르지 않습니다."; exit 1; }
+
+      # Secret이 등록된 경우에만 실제 기상청 API를 프록시로 호출해 본다.
+      # 외부 API 상태에 따라 CI가 깨지지 않도록 실패해도 경고만 남긴다.
+      - name: 기상청 API 프록시 확인 (선택)
+        if: env.API_KEY != ''
+        continue-on-error: true
+        run: |
+          base=$(TZ=Asia/Seoul date -d '-1 hour' +%Y%m%d)
+          time=$(TZ=Asia/Seoul date -d '-1 hour' +%H)00
+          body=$(curl -s "http://localhost:8080/api/getUltraSrtNcst?pageNo=1&numOfRows=10&dataType=JSON&base_date=$base&base_time=$time&nx=60&ny=127")
+          echo "$body" | head -c 500; echo
+          echo "$body" | grep -q '"resultCode":"00"' \
+            || { echo "::warning::기상청 API 응답이 정상이 아닙니다."; exit 1; }
+
+      - name: 실패 시 컨테이너 로그 출력
+        if: failure()
+        run: docker logs "$CONTAINER" || true
+
+      - name: 컨테이너 정리
+        if: always()
+        run: docker rm -f "$CONTAINER" || true
