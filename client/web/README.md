@@ -18,7 +18,7 @@
 | 빌드 도구 | Vite 5 |
 | 스타일링 | Tailwind CSS 3 |
 | 테스트 | Vitest + Testing Library |
-| 컨테이너 | Docker (nginx) |
+| 컨테이너 | Docker (Caddy / nginx) |
 
 ## 프로젝트 구조
 
@@ -46,7 +46,9 @@ client/web/
 │   ├── App.tsx              # 메인 앱 컴포넌트
 │   ├── main.tsx             # 엔트리 포인트
 │   └── index.css            # 전역 스타일
-├── Dockerfile               # 컨테이너 빌드 설정
+├── Dockerfile               # 컨테이너 빌드 설정 (nginx)
+├── Dockerfile.caddy         # 컨테이너 빌드 설정 (Caddy, compose 기본값)
+├── Caddyfile                # Caddy 프록시 설정
 ├── nginx.conf.template      # nginx 프록시 설정
 ├── vite.config.ts           # Vite 빌드 + 프록시 설정
 └── package.json
@@ -90,9 +92,21 @@ docker compose up --build
 # 3. 브라우저에서 http://localhost:8080 접속
 ```
 
+웹 서버는 기본으로 **Caddy**(`Caddyfile`, `Dockerfile.caddy`)를 사용합니다.
+nginx 버전(`nginx.conf.template`, `Dockerfile`)으로 띄우려면:
+
+```bash
+WEB_DOCKERFILE=Dockerfile docker compose up --build
+```
+
 단독 이미지로 실행하려면:
 
 ```bash
+# Caddy
+docker build -f client/web/Dockerfile.caddy -t weather-web-caddy client/web
+docker run -p 8080:80 -e API_KEY_DATA_GO_KR=발급받은_Encoding_인증키 weather-web-caddy
+
+# nginx
 docker build -t weather-web client/web
 docker run -p 8080:80 -e API_KEY_DATA_GO_KR=발급받은_Encoding_인증키 weather-web
 ```

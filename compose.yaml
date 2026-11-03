@@ -6,13 +6,19 @@
 #   2) docker compose up --build
 #   3) http://localhost:8080 접속
 #
+# 웹 서버 선택 (기본: Caddy):
+#   WEB_DOCKERFILE=Dockerfile docker compose up --build   # nginx 버전으로 실행
+#
 # 서버/DB까지 함께 실행 (server 구현 후):
 #   docker compose --profile backend up --build
 # ──────────────────────────────────────────────
 
 services:
   client-web:
-    build: ./client/web
+    build:
+      context: ./client/web
+      # Dockerfile.caddy(기본) 또는 Dockerfile(nginx) 중 선택
+      dockerfile: ${WEB_DOCKERFILE:-Dockerfile.caddy}
     container_name: weather_client_web
     ports:
       - "8080:80"
