@@ -4,7 +4,7 @@
  * 글래스모피즘 스타일의 카드 디자인을 사용한다.
  */
 
-import type { CurrentWeather } from '../types/weather';
+import type { CurrentWeather, SkyCondition } from '../types/weather';
 import WeatherIcon, { getWeatherLabel } from './WeatherIcon';
 
 interface WeatherCardProps {
@@ -18,6 +18,8 @@ interface WeatherCardProps {
   error: string | null;
   /** 새로고침 콜백 */
   onRefresh: () => void;
+  /** 하늘상태 (실황 API에는 없으므로 가장 가까운 예보 값을 사용) */
+  skyCondition?: SkyCondition;
 }
 
 export default function WeatherCard({
@@ -26,6 +28,7 @@ export default function WeatherCard({
   loading,
   error,
   onRefresh,
+  skyCondition,
 }: WeatherCardProps) {
   // 로딩 상태
   if (loading) {
@@ -59,7 +62,7 @@ export default function WeatherCard({
   if (!weather) return null;
 
   /** 강수형태 텍스트 */
-  const precipLabel = getWeatherLabel(undefined, weather.precipitationType);
+  const precipLabel = getWeatherLabel(skyCondition, weather.precipitationType);
 
   return (
     <div className="bg-white/15 backdrop-blur-lg rounded-3xl p-8 shadow-xl" data-testid="weather-card">
@@ -78,6 +81,7 @@ export default function WeatherCard({
       {/* 중앙: 기온 + 날씨 아이콘 */}
       <div className="flex items-center justify-center gap-6 mb-6">
         <WeatherIcon
+          skyCondition={skyCondition}
           precipitationType={weather.precipitationType}
           size="text-7xl"
         />

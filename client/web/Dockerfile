@@ -6,7 +6,8 @@
 #
 # 사용법:
 #   docker build -t weather-web .
-#   docker run -p 8080:80 -e API_KEY_DATA_GO_KR=인증키 weather-web
+#   docker run -p 8080:80 -e API_KEY_DATA_GO_KR=인증키(Encoding) weather-web
+#   (또는 프로젝트 루트에서 docker compose up --build)
 # ──────────────────────────────────────────────
 
 # ── 빌드 스테이지 ──
@@ -15,11 +16,8 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 # 의존성 먼저 설치 (레이어 캐싱 활용)
-COPY package.json pnpm-lock.yaml* package-lock.json* ./
-RUN corepack enable && corepack prepare pnpm@latest --activate || true
-RUN if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; \
-    elif [ -f package-lock.json ]; then npm ci; \
-    else npm install; fi
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
 # 소스 복사 및 빌드
 COPY . .
@@ -27,6 +25,9 @@ RUN npm run build
 
 # ── 실행 스테이지 ──
 FROM nginx:1.27-alpine
+
+# nginx가 컨테이너의 DNS 서버 주소를 NGINX_LOCAL_RESOLVERS로 노출하도록 설정
+ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 
 # nginx 설정 템플릿 복사 (환경변수 치환용)
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template

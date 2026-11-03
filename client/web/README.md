@@ -81,14 +81,25 @@ pnpm test:run
 ### Docker로 실행
 
 ```bash
-# 빌드
-docker build -t weather-web .
+# (프로젝트 루트에서) 1. API 키 설정 — 공공데이터포털의 "Encoding" 인증키를 사용
+cp client/web/.env.example .env   # 파일을 열어 API_KEY_DATA_GO_KR 값 입력
 
-# 실행 (API 키를 환경변수로 전달)
-docker run -p 8080:80 -e API_KEY_DATA_GO_KR=발급받은_인증키 weather-web
+# 2. 빌드 + 실행
+docker compose up --build
 
-# 브라우저에서 http://localhost:8080 접속
+# 3. 브라우저에서 http://localhost:8080 접속
 ```
+
+단독 이미지로 실행하려면:
+
+```bash
+docker build -t weather-web client/web
+docker run -p 8080:80 -e API_KEY_DATA_GO_KR=발급받은_Encoding_인증키 weather-web
+```
+
+> **인증키 주의**: nginx/Vite 프록시는 키를 쿼리스트링에 그대로 붙이므로 **Encoding 키**를 넣어야 합니다.
+> Decoding 키를 넣으면 `SERVICE_KEY_IS_NOT_REGISTERED_ERROR`가 발생할 수 있습니다.
+> 발급 직후에는 키가 활성화되기까지 1~2시간 정도 걸릴 수 있습니다.
 
 ## 테스트
 

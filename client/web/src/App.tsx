@@ -31,6 +31,7 @@ export default function App() {
           loading={loading}
           error={error}
           onRefresh={refetch}
+          skyCondition={forecast[0]?.skyCondition}
         />
         <ForecastList items={forecast} />
       </div>

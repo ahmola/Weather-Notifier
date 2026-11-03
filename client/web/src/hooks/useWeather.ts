@@ -4,7 +4,7 @@
  * 10분마다 자동으로 데이터를 갱신한다.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Location, CurrentWeather, ForecastItem } from '../types/weather';
 import { fetchCurrentWeather, fetchForecast } from '../api/weatherApi';
 
@@ -35,8 +35,12 @@ export function useWeather(location: Location): UseWeatherResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /** 가장 최근 요청 번호 (지역을 빠르게 바꿀 때 이전 응답이 덮어쓰지 않도록) */
+  const requestIdRef = useRef(0);
+
   /** 날씨 데이터 조회 */
   const fetchData = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
 
@@ -46,14 +50,16 @@ export function useWeather(location: Location): UseWeatherResult {
         fetchCurrentWeather(location.nx, location.ny),
         fetchForecast(location.nx, location.ny),
       ]);
+      if (requestId !== requestIdRef.current) return;
 
       setCurrentWeather(weather);
       setForecast(fcst);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       const message = err instanceof Error ? err.message : '날씨 데이터를 가져오는데 실패했습니다.';
       setError(message);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [location.nx, location.ny]);
 

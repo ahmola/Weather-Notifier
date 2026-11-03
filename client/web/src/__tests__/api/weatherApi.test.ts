@@ -20,6 +20,7 @@ import {
   getVilageFcstBaseDateTime,
   parseCurrentWeather,
   parseForecastItems,
+  formatRainfall,
 } from '../../api/weatherApi';
 import type { NcstItem, FcstItem } from '../../types/weather';
 
@@ -115,7 +116,7 @@ describe('parseCurrentWeather', () => {
     expect(result.temperature).toBe(15.2);
     expect(result.humidity).toBe(65);
     expect(result.precipitationType).toBe(0);
-    expect(result.precipitation).toBe('0');
+    expect(result.precipitation).toBe('강수없음');
     expect(result.windSpeed).toBe(3.4);
   });
 
@@ -167,5 +168,20 @@ describe('parseForecastItems', () => {
   it('빈 배열이면 빈 결과를 반환한다', () => {
     const result = parseForecastItems([]);
     expect(result).toHaveLength(0);
+  });
+});
+
+describe('formatRainfall', () => {
+  it('0 또는 빈 값은 "강수없음"으로 표시한다', () => {
+    expect(formatRainfall('0')).toBe('강수없음');
+    expect(formatRainfall(undefined)).toBe('강수없음');
+  });
+
+  it('숫자 값에는 mm 단위를 붙인다', () => {
+    expect(formatRainfall('1.5')).toBe('1.5mm');
+  });
+
+  it('숫자가 아닌 문자열은 그대로 반환한다', () => {
+    expect(formatRainfall('30.0~50.0mm')).toBe('30.0~50.0mm');
   });
 });

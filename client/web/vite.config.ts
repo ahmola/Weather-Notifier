@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         // /api 경로를 기상청 API로 프록시 (CORS 우회 + API 키 자동 주입)
         '/api': {
-          target: 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0',
+          target: 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0',
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/api/, ''),
           configure: (proxy) => {

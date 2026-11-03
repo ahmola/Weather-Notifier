@@ -120,6 +120,35 @@ function buildQuery(params: Record<string, string | number>): string {
 }
 
 /**
+ * 프록시를 통해 기상청 API를 호출하고 JSON 응답을 반환한다.
+ * 인증키 오류 등은 JSON이 아닌 XML(OpenAPI_ServiceResponse)로 내려오므로
+ * 본문을 먼저 텍스트로 읽은 뒤 파싱하여 원인을 에러 메시지에 담는다.
+ */
+async function requestApi<T extends { response: { header: { resultCode: string; resultMsg: string } } }>(
+  endpoint: string,
+  params: Record<string, string | number>,
+): Promise<T> {
+  const res = await fetch(`${BASE_URL}/${endpoint}?${buildQuery(params)}`);
+  const text = await res.text();
+  if (!res.ok) throw new Error(`API 요청 실패: ${res.status}`);
+
+  let data: T;
+  try {
+    data = JSON.parse(text) as T;
+  } catch {
+    const reason = text.match(/<returnAuthMsg>(.*?)<\/returnAuthMsg>/)?.[1];
+    throw new Error(
+      reason ? `API 인증 오류: ${reason} (인증키를 확인하세요)` : 'API 응답을 해석할 수 없습니다.',
+    );
+  }
+
+  if (data.response.header.resultCode !== '00') {
+    throw new Error(`API 오류: ${data.response.header.resultMsg}`);
+  }
+  return data;
+}
+
+/**
  * 초단기실황 데이터를 가져온다 (현재 날씨).
  */
 export async function fetchCurrentWeather(
@@ -127,7 +156,7 @@ export async function fetchCurrentWeather(
   ny: number,
 ): Promise<CurrentWeather> {
   const { baseDate, baseTime } = getNcstBaseDateTime();
-  const query = buildQuery({
+  const data = await requestApi<NcstApiResponse>('getUltraSrtNcst', {
     pageNo: 1,
     numOfRows: 10,
     dataType: 'JSON',
@@ -136,14 +165,6 @@ export async function fetchCurrentWeather(
     nx,
     ny,
   });
-
-  const res = await fetch(`${BASE_URL}/getUltraSrtNcst?${query}`);
-  if (!res.ok) throw new Error(`API 요청 실패: ${res.status}`);
-
-  const data: NcstApiResponse = await res.json();
-  if (data.response.header.resultCode !== '00') {
-    throw new Error(`API 오류: ${data.response.header.resultMsg}`);
-  }
 
   return parseCurrentWeather(data.response.body.items.item);
 }
@@ -156,7 +177,7 @@ export async function fetchForecast(
   ny: number,
 ): Promise<ForecastItem[]> {
   const { baseDate, baseTime } = getUltraSrtFcstBaseDateTime();
-  const query = buildQuery({
+  const data = await requestApi<FcstApiResponse>('getUltraSrtFcst', {
     pageNo: 1,
     numOfRows: 60,
     dataType: 'JSON',
@@ -165,14 +186,6 @@ export async function fetchForecast(
     nx,
     ny,
   });
-
-  const res = await fetch(`${BASE_URL}/getUltraSrtFcst?${query}`);
-  if (!res.ok) throw new Error(`API 요청 실패: ${res.status}`);
-
-  const data: FcstApiResponse = await res.json();
-  if (data.response.header.resultCode !== '00') {
-    throw new Error(`API 오류: ${data.response.header.resultMsg}`);
-  }
 
   return parseForecastItems(data.response.body.items.item);
 }
@@ -195,9 +208,20 @@ export function parseCurrentWeather(items: NcstItem[]): CurrentWeather {
     temperature: parseFloat(map.get('T1H') ?? '0'),
     humidity: parseInt(map.get('REH') ?? '0', 10),
     precipitationType: parseInt(map.get('PTY') ?? '0', 10) as PrecipitationType,
-    precipitation: map.get('RN1') ?? '강수없음',
+    precipitation: formatRainfall(map.get('RN1')),
     windSpeed: parseFloat(map.get('WSD') ?? '0'),
   };
+}
+
+/**
+ * 1시간 강수량(RN1) 값을 표시용 문자열로 변환한다.
+ * 실황 API는 숫자 문자열("0", "1.5")을 주지만 "강수없음" 등의 문자열이 올 수도 있다.
+ */
+export function formatRainfall(value: string | undefined): string {
+  if (value === undefined || value === '') return '강수없음';
+  const num = Number(value);
+  if (Number.isNaN(num)) return value;
+  return num <= 0 ? '강수없음' : `${num}mm`;
 }
 
 /**
