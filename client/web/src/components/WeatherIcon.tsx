@@ -17,49 +17,59 @@ interface WeatherIconProps {
 /**
  * 날씨 상태에 맞는 이모지를 반환한다.
  */
-function getWeatherEmoji(
-  sky?: SkyCondition,
-  pty?: PrecipitationType,
-): string {
+function getWeatherEmoji(sky?: SkyCondition, pty?: PrecipitationType): string {
   // 강수형태가 있으면 우선 적용
   if (pty && pty > 0) {
     switch (pty) {
-      case 1: return '🌧️';  // 비
-      case 2: return '🌨️';  // 비/눈
-      case 3: return '❄️';  // 눈
-      case 4: return '🌦️';  // 소나기
+      case 1:
+        return '🌧️'; // 비
+      case 2:
+        return '🌨️'; // 비/눈
+      case 3:
+        return '❄️'; // 눈
+      case 4:
+        return '🌦️'; // 소나기
     }
   }
 
   // 하늘상태에 따라 아이콘 결정
   switch (sky) {
-    case 1: return '☀️';   // 맑음
-    case 3: return '⛅';   // 구름많음
-    case 4: return '☁️';   // 흐림
-    default: return '🌤️'; // 기본
+    case 1:
+      return '☀️'; // 맑음
+    case 3:
+      return '⛅'; // 구름많음
+    case 4:
+      return '☁️'; // 흐림
+    default:
+      return '🌤️'; // 기본
   }
 }
 
 /**
  * 날씨 상태 텍스트를 반환한다.
  */
-export function getWeatherLabel(
-  sky?: SkyCondition,
-  pty?: PrecipitationType,
-): string {
+export function getWeatherLabel(sky?: SkyCondition, pty?: PrecipitationType): string {
   if (pty && pty > 0) {
     switch (pty) {
-      case 1: return '비';
-      case 2: return '비/눈';
-      case 3: return '눈';
-      case 4: return '소나기';
+      case 1:
+        return '비';
+      case 2:
+        return '비/눈';
+      case 3:
+        return '눈';
+      case 4:
+        return '소나기';
     }
   }
   switch (sky) {
-    case 1: return '맑음';
-    case 3: return '구름많음';
-    case 4: return '흐림';
-    default: return '맑음';
+    case 1:
+      return '맑음';
+    case 3:
+      return '구름많음';
+    case 4:
+      return '흐림';
+    default:
+      return '맑음';
   }
 }
 

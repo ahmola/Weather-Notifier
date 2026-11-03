@@ -12,13 +12,13 @@
 
 ## 기술 스택
 
-| 항목 | 기술 |
-|------|------|
-| 프레임워크 | React 18 + TypeScript |
-| 빌드 도구 | Vite 5 |
-| 스타일링 | Tailwind CSS 3 |
-| 테스트 | Vitest + Testing Library |
-| 컨테이너 | Docker (Caddy / nginx) |
+| 항목       | 기술                     |
+| ---------- | ------------------------ |
+| 프레임워크 | React 18 + TypeScript    |
+| 빌드 도구  | Vite 5                   |
+| 스타일링   | Tailwind CSS 3           |
+| 테스트     | Vitest + Testing Library |
+| 컨테이너   | Docker (Caddy / nginx)   |
 
 ## 프로젝트 구조
 
@@ -127,21 +127,21 @@ pnpm test
 
 ### 테스트 범위
 
-| 영역 | 테스트 내용 |
-|------|------------|
-| `gridConverter` | GPS 위경도 → 격자 좌표 변환 정확성 (서울, 부산, 제주, 강릉) |
-| `weatherApi` | 발표 일시 계산 로직, API 응답 파싱 정확성 |
-| `WeatherCard` | 로딩/에러/정상 상태 렌더링, 새로고침 버튼 동작 |
-| `LocationSelector` | 도시 목록 렌더링, 선택 변경 콜백 |
+| 영역               | 테스트 내용                                                 |
+| ------------------ | ----------------------------------------------------------- |
+| `gridConverter`    | GPS 위경도 → 격자 좌표 변환 정확성 (서울, 부산, 제주, 강릉) |
+| `weatherApi`       | 발표 일시 계산 로직, API 응답 파싱 정확성                   |
+| `WeatherCard`      | 로딩/에러/정상 상태 렌더링, 새로고침 버튼 동작              |
+| `LocationSelector` | 도시 목록 렌더링, 선택 변경 콜백                            |
 
 ## 기상청 API 연동
 
 이 프로젝트는 **기상청_단기예보 조회서비스** API 하나만 사용합니다.
 
-| API | 용도 | 갱신 주기 |
-|-----|------|-----------|
-| 초단기실황 (`getUltraSrtNcst`) | 현재 날씨 표시 | 매시 40분 |
-| 초단기예보 (`getUltraSrtFcst`) | 향후 6시간 예보 | 매시 30분 |
-| 단기예보 (`getVilageFcst`) | 3일 예보 (향후 확장) | 1일 8회 |
+| API                            | 용도                 | 갱신 주기 |
+| ------------------------------ | -------------------- | --------- |
+| 초단기실황 (`getUltraSrtNcst`) | 현재 날씨 표시       | 매시 40분 |
+| 초단기예보 (`getUltraSrtFcst`) | 향후 6시간 예보      | 매시 30분 |
+| 단기예보 (`getVilageFcst`)     | 3일 예보 (향후 확장) | 1일 8회   |
 
 자세한 API 스펙은 [docs/api/README.md](../../docs/api/README.md)를 참조하세요.

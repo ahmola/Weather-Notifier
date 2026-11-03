@@ -33,7 +33,10 @@ export default function WeatherCard({
   // 로딩 상태
   if (loading) {
     return (
-      <div className="bg-white/15 backdrop-blur-lg rounded-3xl p-8 shadow-xl text-center" data-testid="weather-card-loading">
+      <div
+        className="bg-white/15 backdrop-blur-lg rounded-3xl p-8 shadow-xl text-center"
+        data-testid="weather-card-loading"
+      >
         <div className="animate-pulse">
           <div className="text-6xl mb-4">⏳</div>
           <p className="text-white/70 text-lg">날씨 정보를 불러오는 중...</p>
@@ -45,7 +48,10 @@ export default function WeatherCard({
   // 에러 상태
   if (error) {
     return (
-      <div className="bg-red-500/20 backdrop-blur-lg rounded-3xl p-8 shadow-xl text-center" data-testid="weather-card-error">
+      <div
+        className="bg-red-500/20 backdrop-blur-lg rounded-3xl p-8 shadow-xl text-center"
+        data-testid="weather-card-error"
+      >
         <div className="text-5xl mb-4">⚠️</div>
         <p className="text-white text-lg mb-4">{error}</p>
         <button
@@ -65,7 +71,10 @@ export default function WeatherCard({
   const precipLabel = getWeatherLabel(skyCondition, weather.precipitationType);
 
   return (
-    <div className="bg-white/15 backdrop-blur-lg rounded-3xl p-8 shadow-xl" data-testid="weather-card">
+    <div
+      className="bg-white/15 backdrop-blur-lg rounded-3xl p-8 shadow-xl"
+      data-testid="weather-card"
+    >
       {/* 상단: 지역명 + 새로고침 */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-white">{locationName}</h2>

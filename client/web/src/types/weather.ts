@@ -10,14 +10,17 @@
 
 /** API 응답 내 category 필드 값 */
 export type WeatherCategory =
-  | 'T1H' | 'TMP'   // 기온 (실황: T1H, 예보: TMP)
-  | 'TMN' | 'TMX'   // 아침 최저 / 낮 최고 기온
-  | 'POP'            // 강수확률 (%)
-  | 'PTY'            // 강수형태 코드
-  | 'SKY'            // 하늘상태 코드
-  | 'RN1' | 'PCP'   // 1시간 강수량 (실황: RN1, 예보: PCP)
-  | 'REH'            // 습도 (%)
-  | 'WSD';           // 풍속 (m/s)
+  | 'T1H'
+  | 'TMP' // 기온 (실황: T1H, 예보: TMP)
+  | 'TMN'
+  | 'TMX' // 아침 최저 / 낮 최고 기온
+  | 'POP' // 강수확률 (%)
+  | 'PTY' // 강수형태 코드
+  | 'SKY' // 하늘상태 코드
+  | 'RN1'
+  | 'PCP' // 1시간 강수량 (실황: RN1, 예보: PCP)
+  | 'REH' // 습도 (%)
+  | 'WSD'; // 풍속 (m/s)
 
 /** 강수형태: 0=없음, 1=비, 2=비/눈, 3=눈, 4=소나기 */
 export type PrecipitationType = 0 | 1 | 2 | 3 | 4;
