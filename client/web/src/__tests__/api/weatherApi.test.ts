@@ -200,3 +200,18 @@ describe('extractErrorDetail', () => {
     expect(extractErrorDetail('Forbidden')).toBe('Forbidden');
   });
 });
+
+describe('extractErrorDetail (JSON 인증 오류)', () => {
+  it('OpenAPI_ServiceResponse JSON에서 인증 오류 메시지를 추출한다', () => {
+    const body = JSON.stringify({
+      OpenAPI_ServiceResponse: {
+        cmmMsgHeader: {
+          errMsg: 'SERVICE_KEY_IS_NOT_REGISTERED_ERROR',
+          returnAuthMsg: '등록되지 않은 서비스키',
+          returnReasonCode: '30',
+        },
+      },
+    });
+    expect(extractErrorDetail(body)).toBe('등록되지 않은 서비스키 (SERVICE_KEY_IS_NOT_REGISTERED_ERROR)');
+  });
+});

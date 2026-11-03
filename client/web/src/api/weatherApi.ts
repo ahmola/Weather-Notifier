@@ -130,6 +130,11 @@ export function extractErrorDetail(body: string): string {
   if (xmlMsg) return xmlMsg;
   try {
     const json = JSON.parse(body);
+    // 인증 오류는 dataType=JSON이면 OpenAPI_ServiceResponse.cmmMsgHeader 형태로 온다.
+    const auth = json?.OpenAPI_ServiceResponse?.cmmMsgHeader;
+    if (auth?.returnAuthMsg || auth?.errMsg) {
+      return [auth.returnAuthMsg, auth.errMsg && `(${auth.errMsg})`].filter(Boolean).join(' ');
+    }
     const msg = json?.response?.header?.resultMsg ?? json?.message ?? json?.error;
     if (typeof msg === 'string') return msg;
   } catch {
