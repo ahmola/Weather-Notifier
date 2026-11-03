@@ -10,7 +10,7 @@
 # ──────────────────────────────────────────────
 
 # ── 빌드 스테이지 ──
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 
 WORKDIR /app
 
@@ -23,7 +23,10 @@ COPY . .
 RUN npm run build
 
 # ── 실행 스테이지 ──
-FROM caddy:2.8-alpine
+FROM caddy:2.11-alpine
+
+# 베이스 이미지 발행 이후 나온 OS 패키지 보안 패치를 반영한다 (CI 이미지 취약점 스캔 대응)
+RUN apk upgrade --no-cache
 
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /app/dist /srv

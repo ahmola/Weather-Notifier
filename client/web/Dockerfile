@@ -11,7 +11,7 @@
 # ──────────────────────────────────────────────
 
 # ── 빌드 스테이지 ──
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 
 WORKDIR /app
 
@@ -24,10 +24,16 @@ COPY . .
 RUN npm run build
 
 # ── 실행 스테이지 ──
-FROM nginx:1.27-alpine
+FROM nginx:1.30-alpine
+
+# 베이스 이미지 발행 이후 나온 OS 패키지 보안 패치를 반영한다 (CI 이미지 취약점 스캔 대응)
+RUN apk upgrade --no-cache
 
 # nginx가 컨테이너의 DNS 서버 주소를 NGINX_LOCAL_RESOLVERS로 노출하도록 설정
 ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
+
+# 프록시 대상 주소 (기본: 기상청 API). CI의 프록시 검증에서는 가짜 서버 주소로 바꿔서 실행한다.
+ENV KMA_UPSTREAM=https://apis.data.go.kr
 
 # nginx 설정 템플릿 복사 (환경변수 치환용)
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
