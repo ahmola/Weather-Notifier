@@ -303,13 +303,18 @@ jobs:
       #      (패치가 없는 취약점은 우리가 고칠 수 없으므로 제외)
       - name: 이미지 취약점 스캔 (Trivy)
         run: |
-          # 캐시 폴더는 러너 사용자 소유로 미리 만들어 둔다 (actions/cache 저장 시 권한 문제 방지)
+          # Trivy를 러너 사용자 권한으로 실행해 캐시 파일이 root 소유가 되지 않게 한다.
+          # (root 소유면 actions/cache가 캐시를 저장하지 못한다)
+          # docker.sock 접근을 위해 소켓의 그룹(docker)을 추가한다.
           mkdir -p "$HOME/.cache/trivy"
           trivy() {
             docker run --rm \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c %g /var/run/docker.sock)" \
               -v /var/run/docker.sock:/var/run/docker.sock \
-              -v "$HOME/.cache/trivy:/root/.cache/trivy" \
-              "aquasec/trivy:$TRIVY_VERSION" image --scanners vuln --no-progress "$@" "$IMAGE"
+              -v "$HOME/.cache/trivy:/cache" \
+              "aquasec/trivy:$TRIVY_VERSION" image --cache-dir /cache \
+              --scanners vuln --no-progress --skip-version-check "$@" "$IMAGE"
           }
           echo "── HIGH / CRITICAL 전체 (참고) ──"
           trivy --severity HIGH,CRITICAL --exit-code 0
