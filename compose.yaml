@@ -1,28 +1,70 @@
+# ──────────────────────────────────────────────
+# Weather Notifier 로컬 실행용 Compose 파일
+#
+# 웹 클라이언트만 실행 (기본):
+#   1) 프로젝트 루트에 .env 생성 → API_KEY_DATA_GO_KR=공공데이터포털_Encoding_인증키
+#   2) docker compose up --build
+#   3) http://localhost:8080 접속
+#
+# 웹 서버 선택 (기본: Caddy):
+#   WEB_DOCKERFILE=Dockerfile docker compose up --build   # nginx 버전으로 실행
+#
+# 서버/DB까지 함께 실행 (server 구현 후):
+#   docker compose --profile backend up --build
+# ──────────────────────────────────────────────
+
 services:
+  client-web:
+    build:
+      context: ./client/web
+      # Dockerfile.caddy(기본) 또는 Dockerfile(nginx) 중 선택
+      dockerfile: ${WEB_DOCKERFILE:-Dockerfile.caddy}
+    container_name: weather_client_web
+    ports:
+      - "8080:80"
+    environment:
+      # 루트 .env 값이 자동으로 주입된다. 값이 없으면 compose가 에러로 알려준다.
+      API_KEY_DATA_GO_KR: ${API_KEY_DATA_GO_KR:?루트 .env에 API_KEY_DATA_GO_KR를 설정하세요}
+    restart: unless-stopped
+    networks:
+      - weather
+
   postgresql:
-    image: postgresql:latest
+    image: postgres:16-alpine
+    container_name: weather_postgresql
+    profiles: ["backend"]
     ports:
       - "5432:5432"
-    container_name: postgresql
     environment:
-      - name=value
+      POSTGRES_DB: ${POSTGRES_DB:-weather}
+      POSTGRES_USER: ${POSTGRES_USER:-weather}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-weather}
+    volumes:
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     networks:
       - weather
+
   server:
+    # 아직 server/Dockerfile이 비어 있으므로 backend 프로파일에서만 빌드한다.
     build: ./server
-    ports:
-      - "8080:8080"
     container_name: weather_server
-    networks:
-      - weather
-  
-  client-web:
-    build: ./client/web
+    profiles: ["backend"]
     ports:
-      - "80:80"
-    container_name: weather_client_web
+      - "8081:8080"
+    depends_on:
+      postgresql:
+        condition: service_healthy
     networks:
       - weather
+
+volumes:
+  pgdata:
 
 networks:
   weather:
