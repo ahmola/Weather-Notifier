@@ -3,11 +3,14 @@
 #
 # 실행 시점: client/web 또는 이 워크플로 파일이 바뀐 push / Pull Request, 수동 실행
 #
-# Job 구성:
-#   1. web-test   : 의존성 설치 → 단위 테스트 → 타입체크 + 프로덕션 빌드
-#   2. web-audit  : 프로덕션 의존성 보안 취약점 검사 (npm audit)
-#   3. web-docker : Docker 이미지 빌드(Caddy, nginx) → 컨테이너 실행 → 헬스체크 / 스모크 테스트
-#                   (web-test가 성공해야 실행)
+# Job 구성 (빠른 검사 → 느린 검사 순):
+#   1. web-lint   : ESLint + Prettier 포맷 검사
+#   2. web-test   : 단위 테스트 (Vitest) → 타입체크 + 프로덕션 빌드
+#   3. web-audit  : 프로덕션 의존성 보안 취약점 검사 (npm audit)
+#   4. web-e2e    : 실제 브라우저(Chromium) E2E 테스트 (Playwright, 가짜 API 응답 사용)
+#   5. web-docker : Docker 이미지 빌드(Caddy, nginx) → 헬스체크 → 스모크 테스트
+#                   → 프록시 동작 검증(가짜 업스트림) → 이미지 취약점 스캔(Trivy)
+#   1~3은 동시에 실행되고, 4·5는 web-test가 성공해야 실행된다.
 #
 # 선택 사항:
 #   저장소 Secret에 API_KEY_DATA_GO_KR(Encoding 키)를 등록하면
@@ -37,8 +40,41 @@ concurrency:
 permissions:
   contents: read
 
+# 모든 job 공통: Node.js 버전 (Dockerfile 빌드 스테이지와 동일하게 맞춘다)
+env:
+  NODE_VERSION: 24
+
 jobs:
-  # ── 1. 테스트 + 빌드 ──
+  # ── 1. 린트 + 포맷 ──
+  web-lint:
+    name: Web - 린트 / 포맷
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: client/web
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설정 (npm 캐시 사용)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: client/web/package-lock.json
+
+      - name: 의존성 설치
+        run: npm ci --no-audit --no-fund
+
+      - name: ESLint
+        run: npm run lint
+
+      # 실패하면 로컬에서 `npm run format` 실행 후 커밋하면 된다.
+      - name: Prettier 포맷 검사
+        run: npm run format:check
+
+  # ── 2. 단위 테스트 + 빌드 ──
   web-test:
     name: Web - 테스트 / 빌드
     runs-on: ubuntu-latest
@@ -53,7 +89,7 @@ jobs:
       - name: Node.js 설정 (npm 캐시 사용)
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: client/web/package-lock.json
 
@@ -74,7 +110,7 @@ jobs:
           path: client/web/dist
           retention-days: 7
 
-  # ── 2. 의존성 보안 검사 ──
+  # ── 3. 의존성 보안 검사 ──
   web-audit:
     name: Web - 의존성 취약점 검사
     runs-on: ubuntu-latest
@@ -89,18 +125,78 @@ jobs:
       - name: Node.js 설정
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
 
       # 브라우저로 배포되는 프로덕션 의존성만 검사하고, high 이상이면 실패 처리한다.
       - name: npm audit (production, high 이상)
         run: npm audit --omit=dev --audit-level=high
 
-  # ── 3. Docker 빌드 + 헬스체크 ──
+  # ── 4. E2E 테스트 ──
+  web-e2e:
+    name: Web - E2E (Playwright)
+    needs: web-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: client/web
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설정 (npm 캐시 사용)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: client/web/package-lock.json
+
+      - name: 의존성 설치
+        run: npm ci --no-audit --no-fund
+
+      # 브라우저 바이너리(~150MB)는 Playwright 버전별로 캐시해 재사용한다.
+      - name: Playwright 버전 확인
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Playwright 브라우저 캐시
+        id: browser-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      - name: Chromium 설치
+        if: steps.browser-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      # 브라우저는 캐시에서 복원돼도 OS 라이브러리는 매번 필요하다.
+      - name: Chromium 실행용 OS 라이브러리 설치
+        if: steps.browser-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: 프로덕션 빌드
+        run: npm run build
+
+      # playwright.config.ts가 vite preview로 dist를 띄우고 desktop / mobile 화면에서 테스트한다.
+      - name: E2E 테스트 실행
+        run: npm run test:e2e
+
+      # 실패 시 단계별 스크린샷/trace가 담긴 리포트를 내려받아 원인을 확인할 수 있다.
+      - name: 실패 시 테스트 리포트 업로드
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: client/web/playwright-report
+          retention-days: 7
+
+  # ── 5. Docker 빌드 + 헬스체크 + 프록시 검증 + 이미지 스캔 ──
   web-docker:
     name: Web - Docker (${{ matrix.server }})
     needs: web-test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -115,6 +211,12 @@ jobs:
       CONTAINER: weather-web-${{ matrix.server }}
       # 헬스체크 대기 최대 시간(초)
       HEALTH_TIMEOUT: 60
+      # 프록시 검증용 가짜 인증키: Encoding 키처럼 %2B, %2F, %3D 를 넣어 이중 인코딩 여부를 확인한다
+      TEST_KEY: "ci%2Btest%2Fkey%3D%3D"
+      # 가짜 업스트림 포트 (러너 호스트에서 실행)
+      MOCK_PORT: 9000
+      # 이미지 취약점 스캐너 버전 (고정)
+      TRIVY_VERSION: 0.75.0
       # 실제 API 확인용 키 (Secret 미등록 시 빈 값)
       API_KEY: ${{ secrets.API_KEY_DATA_GO_KR }}
     steps:
@@ -136,11 +238,16 @@ jobs:
           cache-from: type=gha,scope=web-${{ matrix.server }}
           cache-to: type=gha,mode=max,scope=web-${{ matrix.server }}
 
-      # Dockerfile의 HEALTHCHECK 주기(30s)를 CI에서는 2s로 줄여 빠르게 확인한다.
-      - name: 컨테이너 실행
+      # 컨테이너가 러너 호스트의 가짜 업스트림에 접속하도록 docker 브리지 게이트웨이 IP를 쓴다.
+      # (nginx resolver는 /etc/hosts를 보지 않으므로 호스트 이름 대신 IP를 사용)
+      # Dockerfile의 HEALTHCHECK 주기(30s)는 CI에서 2s로 줄여 빠르게 확인한다.
+      - name: 컨테이너 실행 (가짜 업스트림 연결)
         run: |
+          gateway=$(docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}')
+          echo "가짜 업스트림 주소: http://$gateway:$MOCK_PORT"
           docker run -d --name "$CONTAINER" -p 8080:80 \
-            -e API_KEY_DATA_GO_KR="${API_KEY:-ci-dummy-key}" \
+            -e API_KEY_DATA_GO_KR="$TEST_KEY" \
+            -e KMA_UPSTREAM="http://$gateway:$MOCK_PORT" \
             --health-interval=2s --health-timeout=3s --health-retries=5 \
             "$IMAGE"
 
@@ -172,15 +279,54 @@ jobs:
           curl -s http://localhost:8080/ | grep -q '<div id="root">' \
             || { echo "::error::index.html 내용이 올바르지 않습니다."; exit 1; }
 
+      # 가짜 업스트림을 띄우고 프록시가 요청을 올바르게 바꿔 전달하는지 확인한다.
+      # (경로 변환, serviceKey 주입/인코딩 유지, Host 헤더, 프록시 헤더 제거, 응답 전달)
+      - name: 프록시 동작 검증 (가짜 업스트림)
+        run: |
+          python3 client/web/scripts/verify-proxy.py \
+            --proxy http://localhost:8080 --port "$MOCK_PORT" --key "$TEST_KEY"
+
+      # 취약점 DB(~수십 MB)는 하루 단위로 캐시해 매번 내려받지 않는다.
+      - name: 날짜 확인 (Trivy DB 캐시 키)
+        id: date
+        run: echo "today=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Trivy DB 캐시
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ steps.date.outputs.today }}
+          restore-keys: trivy-db-
+
+      # 1차: HIGH / CRITICAL 전체를 표로 출력 (참고용, 실패 처리하지 않음)
+      # 2차: 패치 버전이 나와 있는 CRITICAL이 있으면 실패 처리
+      #      (패치가 없는 취약점은 우리가 고칠 수 없으므로 제외)
+      - name: 이미지 취약점 스캔 (Trivy)
+        run: |
+          # 캐시 폴더는 러너 사용자 소유로 미리 만들어 둔다 (actions/cache 저장 시 권한 문제 방지)
+          mkdir -p "$HOME/.cache/trivy"
+          trivy() {
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$HOME/.cache/trivy:/root/.cache/trivy" \
+              "aquasec/trivy:$TRIVY_VERSION" image --scanners vuln --no-progress "$@" "$IMAGE"
+          }
+          echo "── HIGH / CRITICAL 전체 (참고) ──"
+          trivy --severity HIGH,CRITICAL --exit-code 0
+          echo "── 패치 가능한 CRITICAL (있으면 실패) ──"
+          trivy --severity CRITICAL --ignore-unfixed --exit-code 1
+
       # Secret이 등록된 경우에만 실제 기상청 API를 프록시로 호출해 본다.
       # 외부 API 상태에 따라 CI가 깨지지 않도록 실패해도 경고만 남긴다.
-      - name: 기상청 API 프록시 확인 (선택)
+      - name: 실제 기상청 API 호출 확인 (선택)
         if: env.API_KEY != ''
         continue-on-error: true
         run: |
+          docker run -d --name "$CONTAINER-real" -p 8081:80 -e API_KEY_DATA_GO_KR="$API_KEY" "$IMAGE"
+          sleep 3
           base=$(TZ=Asia/Seoul date -d '-1 hour' +%Y%m%d)
           time=$(TZ=Asia/Seoul date -d '-1 hour' +%H)00
-          body=$(curl -s "http://localhost:8080/api/getUltraSrtNcst?pageNo=1&numOfRows=10&dataType=JSON&base_date=$base&base_time=$time&nx=60&ny=127")
+          body=$(curl -s "http://localhost:8081/api/getUltraSrtNcst?pageNo=1&numOfRows=10&dataType=JSON&base_date=$base&base_time=$time&nx=60&ny=127")
           echo "$body" | head -c 500; echo
           echo "$body" | grep -q '"resultCode":"00"' \
             || { echo "::warning::기상청 API 응답이 정상이 아닙니다."; exit 1; }
@@ -191,4 +337,4 @@ jobs:
 
       - name: 컨테이너 정리
         if: always()
-        run: docker rm -f "$CONTAINER" || true
+        run: docker rm -f "$CONTAINER" "$CONTAINER-real" || true
