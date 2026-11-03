@@ -1,0 +1,58 @@
+# ──────────────────────────────────────────────
+# nginx 설정 템플릿
+# Docker 컨테이너 시작 시 ${API_KEY_DATA_GO_KR} 환경변수가 자동 치환된다.
+# (nginx 공식 이미지의 envsubst는 "정의된 환경변수"만 치환하므로
+#  $uri, $1 같은 nginx 변수는 그대로 유지된다.)
+# 정적 파일 서빙 + 기상청 API 프록시 역할을 수행한다.
+# ──────────────────────────────────────────────
+
+# API 프록시 로그 형식: 업스트림(data.go.kr) 응답 코드를 함께 남긴다.
+# $request는 rewrite 이전의 원래 요청이라 인증키가 포함되지 않는다.
+log_format kma_api '$remote_addr [$time_local] "$request" status=$status '
+                   'upstream_status=$upstream_status upstream=$upstream_addr '
+                   'rt=$request_time urt=$upstream_response_time';
+
+server {
+    listen 80;
+    server_name localhost;
+
+    # 정적 파일 서빙 (React 빌드 결과물)
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # SPA 라우팅 지원: 존재하지 않는 경로는 index.html로 폴백
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 기상청 API 프록시
+    # /api/getUltraSrtNcst?... → https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst?serviceKey=...&...
+    # rewrite 대상에 '?'가 포함되면 기존 쿼리스트링이 그 뒤에 '&'로 자동으로 이어 붙는다.
+    # ※ serviceKey는 공공데이터포털의 "Encoding" 인증키를 사용해야 한다(이미 URL 인코딩된 값).
+    location /api/ {
+        # 주의: set은 rewrite 모듈 지시어라 'rewrite ... break' 뒤에 두면 실행되지 않는다.
+        # KMA_UPSTREAM 기본값은 Dockerfile에서 https://apis.data.go.kr 로 지정한다.
+        set $kma_upstream ${KMA_UPSTREAM};
+        rewrite ^/api/(.*)$ /1360000/VilageFcstInfoService_2.0/$1?serviceKey=${API_KEY_DATA_GO_KR} break;
+
+        # 업스트림 DNS를 요청 시점에 조회한다.
+        # (정적 proxy_pass는 nginx 시작 시 DNS 조회에 실패하면 컨테이너가 바로 죽는다)
+        # NGINX_LOCAL_RESOLVERS는 Dockerfile의 NGINX_ENTRYPOINT_LOCAL_RESOLVERS 설정으로
+        # 컨테이너의 /etc/resolv.conf 값이 자동으로 채워진다.
+        resolver ${NGINX_LOCAL_RESOLVERS} valid=300s ipv6=off;
+        proxy_pass $kma_upstream;
+        proxy_ssl_server_name on;
+        proxy_set_header Host apis.data.go.kr;
+        proxy_set_header Accept-Encoding "";
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 10s;
+
+        # 인증키가 없는 원래 요청 + 업스트림 응답 코드를 기록한다 (docker compose logs client-web)
+        access_log /var/log/nginx/access.log kma_api;
+    }
+
+    # gzip 압축
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml;
+    gzip_min_length 1000;
+}
