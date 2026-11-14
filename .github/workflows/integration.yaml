@@ -4,8 +4,8 @@
 # 실행 시점: client/web 또는 이 워크플로 파일이 바뀐 push / Pull Request, 수동 실행
 #
 # Job 구성 (빠른 검사 → 느린 검사 순):
-#   1. web-lint   : ESLint + Prettier 포맷 검사
-#   2. web-test   : 단위 테스트 (Vitest) → 타입체크 + 프로덕션 빌드
+#   1. web-lint   : 정적 검사 — ESLint → Prettier 포맷 → 코드 복잡도 → 타입 검사
+#   2. web-test   : 단위 테스트 (Vitest) → 프로덕션 빌드
 #   3. web-audit  : 프로덕션 의존성 보안 취약점 검사 (npm audit)
 #   4. web-e2e    : 실제 브라우저(Chromium) E2E 테스트 (Playwright, 가짜 API 응답 사용)
 #   5. web-docker : Docker 이미지 빌드(Caddy, nginx) → 헬스체크 → 스모크 테스트
@@ -45,9 +45,9 @@ env:
   NODE_VERSION: 24
 
 jobs:
-  # ── 1. 린트 + 포맷 ──
+  # ── 1. 정적 검사 (코드를 실행하지 않고 잡을 수 있는 문제) ──
   web-lint:
-    name: Web - 린트 / 포맷
+    name: Web - 정적 검사 (린트 / 포맷 / 복잡도 / 타입)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     defaults:
@@ -72,7 +72,20 @@ jobs:
 
       # 실패하면 로컬에서 `npm run format` 실행 후 커밋하면 된다.
       - name: Prettier 포맷 검사
+        if: ${{ !cancelled() }}
         run: npm run format:check
+
+      # 함수별 순환 복잡도 / 중첩 깊이 / 길이 / 매개변수 수 상한 검사.
+      # 기준값은 client/web/eslint.complexity.config.js 에 있다.
+      # 앞 단계가 실패해도 실행해서 한 번에 모든 문제를 볼 수 있게 한다.
+      - name: 코드 복잡도 검사
+        if: ${{ !cancelled() }}
+        run: npm run complexity
+
+      # 앱 소스(src) + 설정 파일 + E2E 테스트 코드의 타입 오류 검사 (tsc, 파일 생성 없음)
+      - name: 타입 검사 (tsc)
+        if: ${{ !cancelled() }}
+        run: npm run typecheck
 
   # ── 2. 단위 테스트 + 빌드 ──
   web-test:
@@ -99,8 +112,8 @@ jobs:
       - name: 단위 테스트 (Vitest)
         run: npm run test:run
 
-      # build 스크립트가 tsc(타입체크) → vite build 순서로 실행한다.
-      - name: 타입체크 + 프로덕션 빌드
+      # build 스크립트가 typecheck → vite build 순서로 실행한다.
+      - name: 프로덕션 빌드
         run: npm run build
 
       - name: 빌드 결과물 업로드
