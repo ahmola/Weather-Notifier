@@ -119,32 +119,70 @@ function buildQuery(params: Record<string, string | number>): string {
     .join('&');
 }
 
+/** XML 오류 응답(returnAuthMsg / errMsg 태그)에서 메시지를 찾는다. 없으면 undefined */
+function findXmlErrorMessage(body: string): string | undefined {
+  const authMsg = body.match(/<returnAuthMsg>(.*?)<\/returnAuthMsg>/);
+  if (authMsg) return authMsg[1];
+  const errMsg = body.match(/<errMsg>(.*?)<\/errMsg>/);
+  return errMsg ? errMsg[1] : undefined;
+}
+
 /**
- * 오류 응답 본문에서 사람이 읽을 수 있는 메시지를 뽑아낸다.
- * data.go.kr은 XML(returnAuthMsg/errMsg), JSON, 평문(Forbidden 등) 등 다양한 형태로 오류를 준다.
+ * JSON 인증 오류(OpenAPI_ServiceResponse.cmmMsgHeader)에서 메시지를 찾는다.
+ * dataType=JSON으로 요청했을 때 인증키 오류가 이 형태로 온다. 없으면 undefined
  */
-export function extractErrorDetail(body: string): string {
-  const xmlMsg =
-    body.match(/<returnAuthMsg>(.*?)<\/returnAuthMsg>/)?.[1] ??
-    body.match(/<errMsg>(.*?)<\/errMsg>/)?.[1];
-  if (xmlMsg) return xmlMsg;
+function findJsonAuthErrorMessage(json: unknown): string | undefined {
+  const header = (json as { OpenAPI_ServiceResponse?: { cmmMsgHeader?: Record<string, unknown> } })
+    ?.OpenAPI_ServiceResponse?.cmmMsgHeader;
+  if (!header) return undefined;
+
+  const { returnAuthMsg, errMsg } = header;
+  const parts = [returnAuthMsg, errMsg ? `(${errMsg})` : undefined].filter(Boolean);
+  return parts.length > 0 ? parts.join(' ') : undefined;
+}
+
+/** 일반 JSON 오류 응답(resultMsg / message / error 필드)에서 메시지를 찾는다. 없으면 undefined */
+function findJsonErrorMessage(json: unknown): string | undefined {
+  const data = json as {
+    response?: { header?: { resultMsg?: unknown } };
+    message?: unknown;
+    error?: unknown;
+  } | null;
+  const candidates = [data?.response?.header?.resultMsg, data?.message, data?.error];
+  return candidates.find((value): value is string => typeof value === 'string');
+}
+
+/** JSON 문자열을 파싱한다. JSON이 아니면 undefined */
+function parseJsonOrUndefined(body: string): unknown {
   try {
-    const json = JSON.parse(body);
-    // 인증 오류는 dataType=JSON이면 OpenAPI_ServiceResponse.cmmMsgHeader 형태로 온다.
-    const auth = json?.OpenAPI_ServiceResponse?.cmmMsgHeader;
-    if (auth?.returnAuthMsg || auth?.errMsg) {
-      return [auth.returnAuthMsg, auth.errMsg && `(${auth.errMsg})`].filter(Boolean).join(' ');
-    }
-    const msg = json?.response?.header?.resultMsg ?? json?.message ?? json?.error;
-    if (typeof msg === 'string') return msg;
+    return JSON.parse(body);
   } catch {
-    /* JSON 아님 */
+    return undefined;
   }
+}
+
+/** HTML/XML 태그와 연속 공백을 제거하고 앞 200자만 남긴다 (평문·HTML 오류 응답용) */
+function toPlainText(body: string): string {
   return body
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 200);
+}
+
+/**
+ * 오류 응답 본문에서 사람이 읽을 수 있는 메시지를 뽑아낸다.
+ * data.go.kr은 XML(returnAuthMsg/errMsg), JSON, 평문(Forbidden 등) 등 다양한 형태로 오류를 준다.
+ * XML → JSON 인증 오류 → 일반 JSON 오류 → 평문 순서로 시도한다.
+ */
+export function extractErrorDetail(body: string): string {
+  const json = parseJsonOrUndefined(body);
+  return (
+    findXmlErrorMessage(body) ??
+    findJsonAuthErrorMessage(json) ??
+    findJsonErrorMessage(json) ??
+    toPlainText(body)
+  );
 }
 
 /**
