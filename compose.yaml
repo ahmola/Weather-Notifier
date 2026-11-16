@@ -51,7 +51,7 @@ services:
       - weather
 
   server:
-    # 아직 server/Dockerfile이 비어 있으므로 backend 프로파일에서만 빌드한다.
+    # Go 백엔드 서버 (현재 GET /healthz 만 제공). backend 프로파일에서만 실행한다.
     build: ./server
     container_name: weather_server
     profiles: ["backend"]
