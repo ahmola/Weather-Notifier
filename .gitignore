@@ -5,3 +5,7 @@ coverage/
 *.tsbuildinfo
 playwright-report/
 test-results/
+
+# Go 빌드 결과물 (server/ 에서 go build ./... 실행 시 생성)
+/server/server
+/server/bin/

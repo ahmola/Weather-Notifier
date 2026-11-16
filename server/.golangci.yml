@@ -1,0 +1,53 @@
+# ──────────────────────────────────────────────
+# golangci-lint 설정 (v2)
+#
+# CI(.github/workflows/server.yaml)의 정적 검사 단계에서 사용한다.
+#   - 린트   : golangci-lint run                       (아래 linters.enable)
+#   - 포맷   : golangci-lint fmt --diff                (아래 formatters)
+#   - 복잡도 : golangci-lint run --enable-only gocyclo,gocognit,nestif,funlen
+#              (린트와 분리해 CI에서 별도 단계로 실행. 기준값은 linters.settings)
+#
+# 로컬 실행: server/ 에서 위 명령을 그대로 실행하면 된다.
+# ──────────────────────────────────────────────
+version: "2"
+
+linters:
+  # 기본 린터(errcheck, govet, ineffassign, staticcheck, unused)에 아래를 추가한다.
+  default: standard
+  enable:
+    - bodyclose      # HTTP 응답 Body를 닫지 않은 곳
+    - errorlint      # 감싼 오류(%w)를 == 로 비교하는 등 잘못된 오류 처리
+    - gocritic       # 버그 가능성이 있거나 어색한 코드
+    - gosec          # 보안 취약 패턴
+    - misspell       # 주석/문자열의 영어 오탈자
+    - noctx          # context 없이 보내는 HTTP 요청
+    - revive         # golint 후속: 이름 규칙, 공개 심볼 주석 등
+    - unconvert      # 불필요한 타입 변환
+    - unparam        # 쓰이지 않는 함수 매개변수
+
+  settings:
+    # ── 복잡도 기준값 (복잡도 단계에서만 사용) ──
+    gocyclo:
+      # 순환 복잡도: 함수 하나의 분기 경로 수
+      min-complexity: 10
+    gocognit:
+      # 인지 복잡도: 중첩이 깊을수록 가중치가 붙는 "읽기 어려움" 점수
+      min-complexity: 15
+    nestif:
+      # 중첩된 if 블록의 복잡도
+      min-complexity: 4
+    funlen:
+      # 함수 길이 (주석 제외)
+      lines: 80
+      statements: 50
+      ignore-comments: true
+
+formatters:
+  enable:
+    - gofumpt        # gofmt보다 엄격한 표준 포맷
+    - goimports      # import 정렬 및 미사용 import 정리
+  settings:
+    goimports:
+      # 이 모듈의 패키지는 외부 패키지와 구분해 별도 그룹으로 정렬한다.
+      local-prefixes:
+        - github.com/ahmola/weather-notifier/server
