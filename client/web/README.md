@@ -126,6 +126,8 @@ npm test                # 감시 모드 (파일 변경 시 자동 재실행)
 npm run lint            # ESLint
 npm run format:check    # Prettier 포맷 검사
 npm run format          # Prettier로 자동 정리
+npm run complexity      # 코드 복잡도 검사 (기준: eslint.complexity.config.js)
+npm run typecheck       # 타입 검사 (src + 설정 파일 + e2e)
 
 # E2E 테스트 (Playwright, 실제 브라우저)
 npx playwright install chromium   # 최초 1회: 브라우저 설치
